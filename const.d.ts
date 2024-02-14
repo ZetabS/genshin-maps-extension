@@ -48,11 +48,18 @@ interface Observable {
   subscribe: (handler: Function) => void;
 }
 
-type ObservablePinData = PinData[] & Observable;
+type ObservablePinDataArray = PinData[] & Observable;
 
+// 지도 및 핀 그리기
 declare let drawMapsLayer: Function;
+// 핀 데이터 불러온 것 한개 추가해주기 (핀 데이터, 핀 정보 / 넣을 시 그룹화 사용, 포커스 유무)
+declare let addPinData: Function;
+// 핀 제거하기
 declare let removePin: Function;
+declare let removeAllPin: Function;
+// 화면의 핀 요소 다시 그리기
 declare const setPinObjectRefresh: Function;
+// 포인트 그리기
 declare const drawPinObject: Function;
 declare const GM_getResourceText: Function;
 declare const GM_addStyle: Function;
@@ -60,7 +67,9 @@ declare const GM_addStyle: Function;
 declare const vanillaSelectBox: any;
 declare const objectViewer: HTMLElement;
 
-declare let MAPS_PinLoad: ObservablePinData;
+// 왼쪽 메뉴에서 로드된 핀 분류
+declare let MAPS_PinLoad: ObservablePinDataArray;
+// 맵에 보여야 하는 핀
 declare let MAPS_ViewPin: Set<string>;
 declare const MAPS_Scale: number;
 declare const MAPS_RelativeX: number;
@@ -277,6 +286,83 @@ function drawMapsLayer2(boolPanelHide) {
   if (boolPanelHide !== false) {
     hidePanelObject();
   }
+}
+
+// 핀 데이터 불러온 것 한개 추가해주기 (핀 데이터, 핀 정보 / 넣을 시 그룹화 사용, 포커스 유무)
+function addPinData2(arrPin, arrSource, boolFocus) {
+  const isExist = Object.values(MAPS_PinGroup.source).some(
+    ({ type, primary }) => type == arrSource.type && arrSource.primary === primary
+  );
+
+  if (isExist) {
+    alert(
+      `${arrSource.name}는(은) 이미 추가된 위치입니다.\n위치 해제는 상단의 위치 관리/숨김에서 해제할 수 있습니다.\n\n이 메시지가 지속적으로 출력될 시 위치 관리/숨김에서 일괄 해제를 눌러주세요.`
+    );
+    return false;
+  }
+
+  if (Array.isArray(arrPin) == false) {
+    // 핀을 오브젝트로 한개만 보냇을 시 배열로 치환
+    arrPin = [arrPin];
+  }
+
+  boolFocus = typeof boolFocus == "boolean" ? boolFocus : true;
+
+  // 그룹 기능 사용 유무 체크.
+  let boolGroup = arrSource != false ? true : false;
+  let arrInputID = [];
+  let intGroupIndex = boolGroup == true ? MAPS_PinGroup.index : false;
+
+  if (boolGroup == true) {
+    MAPS_PinGroup.index++;
+    MAPS_PinGroup.source[intGroupIndex] = arrSource;
+  }
+
+  let arrFocus = false;
+  let strFocusPoint = getParameterByName("point");
+  arrPin.forEach((value) => {
+    // 핀 데이터 버전 체크
+    value = value.version != 2 ? replaceDataUpdate(value) : value;
+    boolGroup == true ? (value.group = intGroupIndex) : false;
+
+    arrInputID.push(value.server);
+    let intInputIndex = MAPS_PinLoad.push(value);
+    value.index = intInputIndex - 1;
+
+    // 위치 포커스 기능
+    if (arrFocus == false && strFocusPoint) {
+      // 특정 위치 검색 기능
+      value.mapData.forEach((point) => {
+        if (point.id != strFocusPoint) return true;
+
+        // 위치 찾을 시 URL 변경 처리
+        arrFocus = { x: point.x, y: point.y };
+        let strURL = location.search.replace("&point=" + point.id, "");
+        history.pushState("", "", strURL);
+        point.highlight = true;
+        return false;
+      });
+    } else if (arrFocus == false && value.mapData[0] && !strFocusPoint && boolFocus == true) {
+      // 첫번째 핀 인덱스
+      arrFocus = { x: value.mapData[0].x, y: value.mapData[0].y };
+    }
+  });
+
+  boolGroup == true ? (MAPS_PinGroup[intGroupIndex] = arrInputID) : false;
+  if (arrFocus !== false) {
+    // 첫번째 위치 포커스 기능
+    setFocusPoint(arrFocus.x, arrFocus.y);
+  }
+
+  // 첫번째 핀 종류에 따라 지도 전환
+  if (arrPin[0] && arrPin[0].maps != MAPS_Type) {
+    changeMapsType({ strCode: arrPin[0].maps }, arrPin[0].maps);
+  }
+
+  setPinDataRefresh();
+  addPanelPinList(intGroupIndex, arrPin, arrSource); // 패널 리스트 추가
+
+  return intGroupIndex;
 }
 
 // 핀 제거하기

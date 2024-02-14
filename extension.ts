@@ -17,7 +17,7 @@
 // @grant        GM_addStyle
 // ==/UserScript==
 
-let UNDERGROUND_IMAGES = [
+const UNDERGROUND_IMAGES = [
   // 숲
   {
     'name': '간다르바_성곽_북_0',
@@ -662,163 +662,108 @@ let UNDERGROUND_IMAGES = [
 
 let IS_UNDERGROUND_ACTIVE = false;
 let IS_VISIBLE_ACTIVE_MAPS_PIN = true;
-let IS_CHEST_PIN_LOADED = false;
-IS_CHEST_PIN_LOADED = MAPS_PinLoad.filter((value: PinData) => value.name?.includes('보물상자')).length > 0;
 
-let chest_pins: PinData[] = MAPS_PinLoad.filter((value: PinData) => value.name?.includes('보물상자'));
+let CHEST_FILTER: { setValue: (arg0: string) => void; ul: { childNodes: any; }; };
+
 const handlers: symbol = Symbol('handlers');
 
-function makeObservable(targetData: PinData[]): ObservablePinData {
-  const target: ObservablePinData = <ObservablePinData>{ ...targetData };
+function updateChestPinLoadedState() {
+  const chestPinElement = document.querySelector('.maps-extension > .chest-pin');
+  if (!chestPinElement) {
+    console.log('chestPinElement does not exists');
+    return;
+  }
+
+  const IS_CHEST_PIN_LOADED = MAPS_PinLoad.filter((value: PinData) => value.name?.includes('보물상자')).length > 0;
+
+  if (IS_CHEST_PIN_LOADED) {
+    chestPinElement.classList.remove('hide');
+  } else {
+    chestPinElement.classList.add('hide');
+  }
+
+  CHEST_FILTER?.setValue('all');
+}
+
+function createElementFromHTML(innerHTML: string): ChildNode {
+  const template: HTMLTemplateElement = document.createElement('template');
+  template.innerHTML = innerHTML;
+  const children: HTMLCollection = template.content.children;
+
+  if (children.length === 1) {
+    return children[0];
+  } else {
+    throw Error('children does not exists');
+  }
+}
+
+function makeObservable(originTargetArray: PinData[] | ObservablePinDataArray): ObservablePinDataArray {
+  const target: ObservablePinDataArray = <ObservablePinDataArray>originTargetArray.slice();
   target[handlers] = [];
   target.subscribe = function(handler) {
     this[handlers].push(handler);
   };
 
-  return new Proxy(target, {
-    set(target, property, value, receiver) {
+  const proxyHandler = {
+    set: (target: Array<any> & Observable, property: any, value: any, receiver: any) => {
       const success = Reflect.set(target, property, value, receiver);
       if (success) {
         target[handlers].forEach((handler) => handler(property, value));
       }
       return success;
     }
-  });
+  };
+
+  return new Proxy(target, proxyHandler);
 }
+
+// addMapsExtensionSwitch
 
 function addMapsExtensionSwitch() {
-  const template = document.createElement('template');
-  template.innerHTML = `
+  const mapsExtensionElement = createElementFromHTML(`
     <div class="maps-extension">
-        <div class="chest-pin">
-            <div class="maps-extension-switch-label">상자 필터</div>
-            <select id="chest-filter" multiple>
-                <option value="평범한" style="color: gray;">평범한</option>
-                <option value="정교한" style="color: #9ee0d4;">정교한</option>
-                <option value="진귀한" style="color: #e6ba7b;">진귀한</option>
-                <option value="화려한" style="color: #ff6c38;">화려한</option>
-                <option value="신묘한" style="color: #accb29;">신묘한</option>
-            </select>
-        </div>
-        <div class="maps-extension-switch-label">활성맵 핀</div>
-        <div id="visibleActiveMapsPinSwitch" class="maps-extension-switch on"></div>
-        <div class="maps-extension-switch-label">지하 맵</div>
-        <div id="undergroundSwitch" class="maps-extension-switch"></div>
-    </div>`;
+      <div class="chest-pin">
+        <div class="maps-extension-switch-label">상자 필터</div>
+        <select id="chest-filter" multiple>
+          <option value="평범한" style="color: gray;">평범한</option>
+          <option value="정교한" style="color: #9ee0d4;">정교한</option>
+          <option value="진귀한" style="color: #e6ba7b;">진귀한</option>
+          <option value="화려한" style="color: #ff6c38;">화려한</option>
+          <option value="신묘한" style="color: #accb29;">신묘한</option>
+        </select>
+      </div>
+      <div class="maps-extension-switch-label">활성맵 핀</div>
+      <div id="visibleActiveMapsPinSwitch" class="maps-extension-switch on"></div>
+      <div class="maps-extension-switch-label">지하 맵</div>
+      <div id="undergroundSwitch" class="maps-extension-switch"></div>
+    </div>`);
 
-  const templateContentChildNodesElement = template.content.childNodes[1];
+  const mapsAddonsMenuElement: HTMLElement = <HTMLElement>document.getElementById('mapsAddonsMenu');
+  mapsAddonsMenuElement.after(mapsExtensionElement);
 
-  const mapsAddonsMenuElement = document.getElementById('mapsAddonsMenu');
-  if (mapsAddonsMenuElement) {
-    mapsAddonsMenuElement.after(templateContentChildNodesElement);
-  } else {
-    console.log('mapsAddonsMenuElement does not exists');
-  }
-
-  const undergroundSwitchElement = document.getElementById('undergroundSwitch');
-  if (undergroundSwitchElement) {
-    undergroundSwitchElement.addEventListener('click', () => {
-      IS_UNDERGROUND_ACTIVE = !IS_UNDERGROUND_ACTIVE;
-      if (IS_UNDERGROUND_ACTIVE) {
-        undergroundSwitchElement.classList.add('on');
-        addUndergroundLayer();
-      } else {
-        undergroundSwitchElement.classList.remove('on');
-        removeUndergroundLayer();
-      }
-      setPinObjectRefresh();
-    });
-  } else {
-    console.log('undergroundSwitchElement does not exists');
-  }
-
-  const visibleActiveMapsPinSwitchElement = document.getElementById('visibleActiveMapsPinSwitch');
-  if (visibleActiveMapsPinSwitchElement) {
-    visibleActiveMapsPinSwitchElement.addEventListener('click', () => {
-      IS_VISIBLE_ACTIVE_MAPS_PIN = !IS_VISIBLE_ACTIVE_MAPS_PIN;
-      if (IS_VISIBLE_ACTIVE_MAPS_PIN) {
-        visibleActiveMapsPinSwitchElement.classList.add('on');
-      } else {
-        visibleActiveMapsPinSwitchElement.classList.remove('on');
-      }
-      setPinObjectRefresh();
-    });
-  } else {
-    console.log('visibleActiveMapsPinSwitchElement does not exists');
-  }
-}
-
-function addUndergroundLayer() {
-  const layerScale = MAPS_ViewSize / MAPS_Size;
-
-  const undergroundLayerTemplate = document.createElement('template');
-  undergroundLayerTemplate.innerHTML = `
-    <div id="mapsLayerUnderground" class="underground-layer" style="width: 17920px; height: 17920px; transform: scale(${layerScale});">
-    </div>`;
-  const undergroundLayer = undergroundLayerTemplate.content.childNodes[1];
-
-  UNDERGROUND_IMAGES.forEach((image, index) => {
-    const x = image.offset[0] + MAPS_RelativeX;
-    const y = image.offset[1] + MAPS_RelativeY;
-    const url = `https://github.com/juhyeon-cha/genshin-maps-extension/raw/main/${image.url}`;
-    const undergroundImageTemplate = document.createElement('template');
-    undergroundImageTemplate.innerHTML = `
-        <div class="underground-image" data-index="${index}" data-name="${image.name}" style="width: ${image.size[0]}px; height: ${image.size[1]}px; transform: translate(${x}px, ${y}px) scale(1);">
-            <div style="background-image: url(${url}); background-size: ${image.size[2]}%"></div>
-        </div>`;
-
-    undergroundLayer.appendChild(undergroundImageTemplate.content.childNodes[1]);
-  });
-  // const template2 = document.createElement('template');
-  // template2.innerHTML = '<div style="background-color: black; opacity: 0.5; width: 100%; height: 100%;"></div>';
-
-  undergroundLayer.appendChild(undergroundLayerTemplate.content.childNodes[0]);
-
-  const mapsLayerBackgroundElement = document.getElementById('mapsLayerBackground');
-  if (mapsLayerBackgroundElement) {
-    mapsLayerBackgroundElement.after(undergroundLayer);
-  } else {
-    console.log('mapsLayerBackground does not exists');
-  }
-}
-
-function removeUndergroundLayer() {
-  const mapsLayerUndergroundElement = document.getElementById('mapsLayerUnderground');
-  if (mapsLayerUndergroundElement) {
-    mapsLayerUndergroundElement.remove();
-  }
-}
-
-let CHEST_FILTER: { setValue: (arg0: string) => void; ul: { childNodes: any; }; };
-
-function addChestPinEvent() {
-  const observable_chest_pins = makeObservable(chest_pins);
-  observable_chest_pins.subscribe((property: any, isPinLoaded: any) => {
-    const chestPinEl = document.querySelector('.maps-extension > .chest-pin');
-    if (!chestPinEl) {
-      console.log('chestPinEl does not exists');
-      return;
-    }
-
-    if (isPinLoaded) {
-      chestPinEl.classList.remove('hide');
+  const undergroundSwitchElement: HTMLElement = <HTMLElement>document.getElementById('undergroundSwitch');
+  undergroundSwitchElement.addEventListener('click', () => {
+    IS_UNDERGROUND_ACTIVE = !IS_UNDERGROUND_ACTIVE;
+    if (IS_UNDERGROUND_ACTIVE) {
+      undergroundSwitchElement.classList.add('on');
+      addUndergroundLayer();
     } else {
-      chestPinEl.classList.add('hide');
+      undergroundSwitchElement.classList.remove('on');
+      removeUndergroundLayer();
     }
-    CHEST_FILTER?.setValue('all');
+    setPinObjectRefresh();
   });
 
-  const chestPinEl = document.querySelector('.maps-extension > .chest-pin');
-  if (!chestPinEl) {
-    console.log('chestPinEl does not exists');
-    return;
-  }
-
-  if (IS_CHEST_PIN_LOADED) {
-    chestPinEl.classList.remove('hide');
-  } else {
-    chestPinEl.classList.add('hide');
-  }
+  const visibleActiveMapsPinSwitchElement: HTMLElement = <HTMLElement>document.getElementById('visibleActiveMapsPinSwitch');
+  visibleActiveMapsPinSwitchElement.addEventListener('click', () => {
+    IS_VISIBLE_ACTIVE_MAPS_PIN = !IS_VISIBLE_ACTIVE_MAPS_PIN;
+    if (IS_VISIBLE_ACTIVE_MAPS_PIN) {
+      visibleActiveMapsPinSwitchElement.classList.add('on');
+    } else {
+      visibleActiveMapsPinSwitchElement.classList.remove('on');
+    }
+    setPinObjectRefresh();
+  });
 
   CHEST_FILTER = new vanillaSelectBox('#chest-filter', {
     placeHolder: '상자 선택',
@@ -833,22 +778,59 @@ function addChestPinEvent() {
     keepInlineStyles: false,
     keepInlineCaretStyles: false
   });
+
   CHEST_FILTER.setValue('all');
+
   for (const li of CHEST_FILTER.ul.childNodes) {
     if (li.dataset.value !== 'all') {
       li.textContent += ' ■';
     }
   }
-  const chestFilter = document.getElementById('chest-filter');
-  if (!chestFilter) {
-    console.log('chestFilter does not exists');
-    return;
-  }
+
+  const chestFilter: HTMLElement = <HTMLElement>document.getElementById('chest-filter');
 
   chestFilter.addEventListener('change', () => {
     setPinObjectRefresh();
   });
 }
+
+function addUndergroundLayer() {
+  const layerScale = MAPS_ViewSize / MAPS_Size;
+  const undergroundLayerElement = createElementFromHTML(`
+    <div id="mapsLayerUnderground" class="underground-layer" style="width: 17920px; height: 17920px; transform: scale(${layerScale});"></div>`);
+
+  UNDERGROUND_IMAGES.forEach((image, index) => {
+    const x = image.offset[0] + MAPS_RelativeX;
+    const y = image.offset[1] + MAPS_RelativeY;
+    const url = `https://github.com/juhyeon-cha/genshin-maps-extension/raw/main/${image.url}`;
+    const undergroundImage = createElementFromHTML(`
+        <div class="underground-image" data-index="${index}" data-name="${image.name}" style="width: ${image.size[0]}px; height: ${image.size[1]}px; transform: translate(${x}px, ${y}px) scale(1);">
+          <div style="background-image: url(${url}); background-size: ${image.size[2]}%"></div>
+        </div>`);
+
+    undergroundLayerElement.appendChild(undergroundImage);
+  });
+
+  const mapsLayerBackgroundElement = document.getElementById('mapsLayerBackground');
+  if (!mapsLayerBackgroundElement) {
+    console.log('mapsLayerBackgroundElement does not exists');
+    return;
+  }
+
+  mapsLayerBackgroundElement.after(undergroundLayerElement);
+}
+
+function removeUndergroundLayer() {
+  const mapsLayerUndergroundElement = document.getElementById('mapsLayerUnderground');
+  if (!mapsLayerUndergroundElement) {
+    console.log('mapsLayerBackgroundElement does not exists');
+    return;
+  }
+
+  mapsLayerUndergroundElement.remove();
+}
+
+// drawMapsLayer
 
 function adjustMapsLayer() {
   if (Object.prototype.toString.call(MAPS_ViewPin) != '[object Set]' || MAPS_ViewPin.size <= 0) return;
@@ -980,6 +962,7 @@ function removeDisabledMapsPin() {
   document.querySelectorAll(`#mapsLayerPoint > .maps-point${dataSelector}`).forEach(element => element.remove());
 }
 
+// 맵을 움직일 때마다(맵에서 검정색이 잠시 보일 때마다) 실행되는 함수
 drawMapsLayer = (function(originDrawMapsLayer) {
   'use strict';
 
@@ -992,26 +975,29 @@ drawMapsLayer = (function(originDrawMapsLayer) {
 
 }(drawMapsLayer));
 
-// removePin = (function(originRemovePin) {
-//   'use strict';
-//
-//   const _proxyLoadedPin = () => {
-//     IS_CHEST_PIN_LOADED = MAPS_PinLoad.filter(value => value.name?.includes('보물상자')).length > 0;
-//     MAPS_PinLoad = makeObservable(MAPS_PinLoad);
-//     MAPS_PinLoad.subscribe((index: any, value: { name: string | string[]; }) => {
-//       if (Object.prototype.toString.call(value) == '[object Object]' && value.name?.includes('보물상자')) {
-//         IS_CHEST_PIN_LOADED = true;
-//       }
-//     });
-//   };
-//
-//   _proxyLoadedPin();
-//   return (boolGroup: any, pinIndex: any, boolTabUpdate: any) => {
-//     originRemovePin(boolGroup, pinIndex, boolTabUpdate);
-//     _proxyLoadedPin();
-//   };
-//
-// }(removePin));
+// 왼쪽 메뉴에서 핀을 제거할 때마다 실행되는 함수
+removePin = ((originRemovePin) => {
+  'use strict';
+
+  /*
+  MAPS_PinLoad를 프록시 상태로 변경해야 함.
+  MAPS_PinLoad를 웹사이트 어디선가 지속적으로 재할당하는 것으로 추정중.
+  */
+  function _proxyLoadedPin() {
+    MAPS_PinLoad = makeObservable(MAPS_PinLoad);
+    MAPS_PinLoad.subscribe(() => {
+      updateChestPinLoadedState();
+    });
+  }
+
+  _proxyLoadedPin(); // 웹 사이트 로드 시
+
+  return (boolGroup: any, pinIndex: any, boolTabUpdate: any) => {
+    originRemovePin(boolGroup, pinIndex, boolTabUpdate);
+    updateChestPinLoadedState();
+    _proxyLoadedPin();
+  };
+})(removePin);
 
 // Main
 (function() {
@@ -1019,8 +1005,9 @@ drawMapsLayer = (function(originDrawMapsLayer) {
   GM_addStyle(selectbox_css);
   const extension_css = GM_getResourceText('extension_css');
   GM_addStyle(extension_css);
+
   addMapsExtensionSwitch();
-  addChestPinEvent();
+  updateChestPinLoadedState();
 
   // 지도 클릭 이벤트
   // objectViewer.addEventListener('click', function(e) {
