@@ -19,6 +19,7 @@
 let IS_VISIBLE_ACTIVE_MAPS_PIN = true;
 let IS_UNDERGROUND_ACTIVE = false;
 let CHEST_FILTER;
+let CHEST_PIN_DATA = MAPS_PinLoad.filter((value) => value.name?.includes('보물상자'));
 // 왼쪽 메뉴에서 보물상자 핀이 선택되었는지 업데이트하는 함수
 function updateChestPinLoadedState() {
     const chestPinElement = document.querySelector('.maps-extension > .chest-pin');
@@ -120,8 +121,7 @@ function addMapsExtensionSwitch() {
 }
 // 상자 종류를 반환하는 함수
 function getChestCategoryName(mapData) {
-    const chestPinData = MAPS_PinLoad.filter((value) => value.name?.includes('보물상자'));
-    for (const pinData of chestPinData) {
+    for (const pinData of CHEST_PIN_DATA) {
         if (!pinData.category) {
             continue;
         }
@@ -164,6 +164,7 @@ function filterPinDrawGet() {
         }
     });
 }
+// 지도 탐색 메뉴에서 지상 지하를 변경할 때 이벤트를 추가하는 함수
 function addMapChangeEventListener() {
     const undergroundSwitchElement = document.getElementById('undergroundSwitch');
     document.querySelector('[data-target=\'지상 지도\']').addEventListener('click', () => {
@@ -198,14 +199,15 @@ removePin = ((originRemovePin) => {
         MAPS_PinLoad = new Proxy(target, {
             set: (target, property, value, receiver) => {
                 updateChestPinLoadedState();
+                CHEST_PIN_DATA = MAPS_PinLoad.filter((value) => value.name?.includes('보물상자'));
                 return Reflect.set(target, property, value, receiver);
             }
         });
     }
     _makePinLoadProxy(); // 유저스크립트 로드 시
     return (boolGroup, pinIndex, boolTabUpdate) => {
+        console.log('removePin');
         originRemovePin(boolGroup, pinIndex, boolTabUpdate);
-        updateChestPinLoadedState();
         _makePinLoadProxy();
     };
 })(removePin);
@@ -216,6 +218,5 @@ removePin = ((originRemovePin) => {
     const extension_css = GM_getResourceText('extension_css');
     GM_addStyle(extension_css);
     addMapsExtensionSwitch();
-    updateChestPinLoadedState();
     filterPinDrawGet();
 }());
