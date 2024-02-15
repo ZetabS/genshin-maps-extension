@@ -838,15 +838,53 @@ function injectPinDrawGet() {
         return undefined;
       }
 
-      // const chestPinData = MAPS_PinLoad.filter((value: PinData) => value.name?.includes('보물상자'));
+      const chestFilterValue = getChestFilterValue();
+
+      const chestFilteredResult = originalResult.filter((mapData: MapData) => {
+        return !mapData.category || chestFilterValue.includes(getCategoryName(mapData) || '');
+      });
+
       if (IS_VISIBLE_ACTIVE_MAPS_PIN) {
-        return originalResult.filter((mapData: MapData) => {
-          return IS_UNDERGROUND_ACTIVE === mapData.tag?.includes('지하');
+        return chestFilteredResult.filter((mapData: MapData) => {
+          return IS_UNDERGROUND_ACTIVE === mapData.tag?.includes('지하') || isUndergroundEntrance(mapData);
         });
       }
-      return originalResult;
+
+      return chestFilteredResult;
     }
   });
+}
+
+function getChestFilterValue() {
+  const chestFilter: HTMLSelectElement = <HTMLSelectElement>document.getElementById('chest-filter');
+  if (!chestFilter) {
+    console.log('chestFilter does not exists');
+    return [];
+  }
+
+  return Array.from(chestFilter.selectedOptions).map(v => v.value);
+}
+
+function getCategoryName(mapData: MapData) {
+  const chestPinData = MAPS_PinLoad.filter((value: PinData) => value.name?.includes('보물상자'));
+  for (const pinData of chestPinData) {
+    if (!pinData.category) {
+      continue;
+    }
+    for (const categoryId in pinData.category) {
+      if (mapData.category === categoryId) {
+        return pinData.category[categoryId].name;
+      }
+    }
+  }
+  return undefined;
+}
+
+function isUndergroundEntrance(mapData: MapData) {
+  const entrancePinData = MAPS_PinLoad.filter((value: PinData) => value.name?.includes('지하 및 실내 구역 입구'));
+  return entrancePinData.some((pinData) =>
+    pinData.mapData && pinData.mapData.some((entranceMapData) => entranceMapData.id === mapData.id)
+  );
 }
 
 function drawUndergroundLayer() {
@@ -911,6 +949,7 @@ removePin = ((originRemovePin) => {
   addMapsExtensionSwitch();
   updateChestPinLoadedState();
   injectPinDrawGet();
+  getChestFilterValue();
 
   // 지도 클릭 이벤트
   // objectViewer.addEventListener('click', function(e) {
