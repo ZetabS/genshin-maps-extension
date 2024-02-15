@@ -106,8 +106,8 @@ function addMapsExtensionSwitch() {
       'all': '전체',
       'item': 'item',
       'items': 'items',
-      'selectAll': '전체',
-      'clearAll': '전체'
+      'selectAll': '전체 선택',
+      'clearAll': '전체 취소'
     },
     disableSelectAll: false,
     keepInlineStyles: false,
