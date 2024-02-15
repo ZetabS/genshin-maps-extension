@@ -133,7 +133,7 @@ function addMapsExtensionSwitch() {
 }
 
 // 상자 종류를 반환하는 함수
-function getCategoryName(mapData: MapData): string | undefined {
+function getChestCategoryName(mapData: MapData): string | undefined {
   const chestPinData = MAPS_PinLoad.filter((value: PinData) => value.name?.includes('보물상자'));
   for (const pinData of chestPinData) {
     if (!pinData.category) {
@@ -169,7 +169,11 @@ function filterPinDrawGet() {
       const chestFilterValue = Array.from(chestFilter.selectedOptions).map(v => v.value);
 
       const chestFilteredResult = originalResult.filter((mapData: MapData) => {
-        return !mapData.category || chestFilterValue.includes(getCategoryName(mapData) || '');
+        if (!mapData.category) {
+          return true;
+        }
+        const chestCategoryName = getChestCategoryName(mapData);
+        return !chestCategoryName || chestFilterValue.includes(chestCategoryName);
       });
 
       if (IS_VISIBLE_ACTIVE_MAPS_PIN) {

@@ -118,17 +118,8 @@ function addMapsExtensionSwitch() {
         setPinObjectRefresh();
     });
 }
-// 현재 선택된 상자 필터의 값을 반환하는 함수
-function getChestFilterValue() {
-    const chestFilter = document.getElementById('chest-filter');
-    if (!chestFilter) {
-        console.log('chestFilter does not exists');
-        return [];
-    }
-    return Array.from(chestFilter.selectedOptions).map(v => v.value);
-}
 // 상자 종류를 반환하는 함수
-function getCategoryName(mapData) {
+function getChestCategoryName(mapData) {
     const chestPinData = MAPS_PinLoad.filter((value) => value.name?.includes('보물상자'));
     for (const pinData of chestPinData) {
         if (!pinData.category) {
@@ -155,9 +146,14 @@ function filterPinDrawGet() {
             if (!originalResult) {
                 return undefined;
             }
-            const chestFilterValue = getChestFilterValue();
+            const chestFilter = document.getElementById('chest-filter');
+            const chestFilterValue = Array.from(chestFilter.selectedOptions).map(v => v.value);
             const chestFilteredResult = originalResult.filter((mapData) => {
-                return !mapData.category || chestFilterValue.includes(getCategoryName(mapData) || '');
+                if (!mapData.category) {
+                    return true;
+                }
+                const chestCategoryName = getChestCategoryName(mapData);
+                return !chestCategoryName || chestFilterValue.includes(chestCategoryName);
             });
             if (IS_VISIBLE_ACTIVE_MAPS_PIN) {
                 return chestFilteredResult.filter((mapData) => {
