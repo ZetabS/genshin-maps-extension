@@ -841,7 +841,7 @@ function injectPinDrawGet() {
       // const chestPinData = MAPS_PinLoad.filter((value: PinData) => value.name?.includes('보물상자'));
       if (IS_VISIBLE_ACTIVE_MAPS_PIN) {
         return originalResult.filter((mapData: MapData) => {
-          return IS_UNDERGROUND_ACTIVE === mapData.tag.includes('지하');
+          return IS_UNDERGROUND_ACTIVE === mapData.tag?.includes('지하');
         });
       }
       return originalResult;
