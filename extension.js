@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         게임닷 원신 맵스 확장
 // @namespace    view underground map
-// @version      4.4
+// @version      3.0
 // @description  원신 맵스에 여러 기능을 추가하는 유저스크립트
 // @author       Zetab_S, juhyeon-cha
 // @match        https://genshin.gamedot.org/?mid=genshinmaps
