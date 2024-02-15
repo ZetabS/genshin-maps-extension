@@ -81,6 +81,7 @@ function addMapsExtensionSwitch() {
         }
         setPinObjectRefresh();
     });
+    addMapChangeEventListener();
     const visibleActiveMapsPinSwitchElement = document.getElementById('visibleActiveMapsPinSwitch');
     visibleActiveMapsPinSwitchElement.addEventListener('click', () => {
         IS_VISIBLE_ACTIVE_MAPS_PIN = !IS_VISIBLE_ACTIVE_MAPS_PIN;
@@ -166,6 +167,27 @@ function filterPinDrawGet() {
         }
     });
 }
+function addMapChangeEventListener() {
+    const undergroundSwitchElement = document.getElementById('undergroundSwitch');
+    document.querySelector('[data-target=\'지상 지도\']').addEventListener('click', () => {
+        IS_UNDERGROUND_ACTIVE = false;
+        undergroundSwitchElement.classList.remove('on');
+        setPinObjectRefresh();
+    });
+    document.querySelector('[data-target=\'지하 지도\']').addEventListener('click', () => {
+        IS_UNDERGROUND_ACTIVE = true;
+        undergroundSwitchElement.classList.add('on');
+        setPinObjectRefresh();
+    });
+}
+// 맵 타입을 변경할 때마다 실행되는 함수
+changeMapsType = ((originChangeMapsType) => {
+    'use strict';
+    return (obj, mapCode = '') => {
+        originChangeMapsType(obj, mapCode);
+        addMapChangeEventListener();
+    };
+})(changeMapsType);
 // 왼쪽 메뉴에서 핀을 제거할 때마다 실행되는 함수
 removePin = ((originRemovePin) => {
     'use strict';
