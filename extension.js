@@ -695,7 +695,7 @@ function makeObservable(originTargetArray) {
     target.subscribe = function (handler) {
         this[handlers].push(handler);
     };
-    const proxyHandler = {
+    return new Proxy(target, {
         set: (target, property, value, receiver) => {
             const success = Reflect.set(target, property, value, receiver);
             if (success) {
@@ -703,8 +703,7 @@ function makeObservable(originTargetArray) {
             }
             return success;
         }
-    };
-    return new Proxy(target, proxyHandler);
+    });
 }
 // addMapsExtensionSwitch
 function addMapsExtensionSwitch() {
@@ -805,99 +804,20 @@ function removeUndergroundLayer() {
     mapsLayerUndergroundElement.remove();
 }
 // drawMapsLayer
-function adjustMapsLayer() {
-    if (Object.prototype.toString.call(MAPS_ViewPin) != '[object Set]' || MAPS_ViewPin.size <= 0)
-        return;
-    const chestFilter = document.getElementById('chest-filter');
-    if (!chestFilter) {
-        console.log('chestFilter does not exists');
-        return;
-    }
-    const selectedValues = Array.from(chestFilter.selectedOptions).map(v => v.value);
-    const OBJECT_PIN_LAYER = document.getElementById('mapsLayerPoint');
-    if (!OBJECT_PIN_LAYER) {
-        console.log('OBJECT_PIN_LAYER does not exists');
-        return;
-    }
-    MAPS_ViewPin.forEach((v) => {
-        const arrDrawPin = MAPS_PinDraw.get(v) || [];
-        if (Object.prototype.toString.call(arrDrawPin) != '[object Array]' || arrDrawPin.length <= 0) {
-            return true;
-        }
-        const mapPinGroup = new Map();
-        arrDrawPin.forEach((point) => {
-            const arrPinData = MAPS_PinLoad[point.pin];
-            if (point.category && arrPinData.category && arrPinData.category[point.category]) {
-                const arrCategory = arrPinData.category[point.category];
-                if (arrPinData.name?.includes('보물상자')) {
-                    if (!selectedValues.includes(arrCategory.name)) {
-                        document.querySelector(`.maps-point[data-pin="${point.pin}"][data-point="${point.point}"]`)?.remove();
-                        return true;
-                    }
-                }
+function injectPinDrawGet() {
+    MAPS_PinDraw.get = new Proxy(MAPS_PinDraw.get, {
+        apply: function (target, thisArg, argumentsList) {
+            const originalResult = target.call(thisArg, argumentsList[0]);
+            if (!originalResult) {
+                return undefined;
             }
-            if (MAPS_State.pinGroup) {
-                // 핀 그룹화를 위해 평균 구하기.
-                let arrPinGroup = mapPinGroup.get(point.pin);
-                arrPinGroup = arrPinGroup ? arrPinGroup : { x: 0, y: 0, state: 0, length: 0, points: [], point: point };
-                arrPinGroup.x += point.x;
-                arrPinGroup.y += point.y;
-                arrPinGroup.points.push(point);
-                arrPinGroup.length++;
-                arrPinGroup.state = point.state ? arrPinGroup.state + 1 : arrPinGroup.state;
-                mapPinGroup.set(point.pin, arrPinGroup);
-                return false;
+            // const chestPinData = MAPS_PinLoad.filter((value: PinData) => value.name?.includes('보물상자'));
+            if (IS_VISIBLE_ACTIVE_MAPS_PIN) {
+                return originalResult.filter((mapData) => {
+                    return IS_UNDERGROUND_ACTIVE === mapData.tag.includes('지하');
+                });
             }
-        });
-        if (MAPS_State.pinGroup) {
-            mapPinGroup.forEach((value) => {
-                const arrData = v.split('/', 2);
-                let state = 0;
-                let length = 0;
-                let x = 0;
-                let y = 0;
-                for (const point of value.points) {
-                    const pin = document.querySelector(`.maps-point[data-pin="${point.pin}"][data-point="${point.point}"]`);
-                    if (pin) {
-                        pin.remove();
-                    }
-                    const isUnderground = point.tag?.includes('지하');
-                    if (IS_UNDERGROUND_ACTIVE !== isUnderground && IS_VISIBLE_ACTIVE_MAPS_PIN) {
-                        continue;
-                    }
-                    if (point.state) {
-                        state++;
-                    }
-                    x += point.x;
-                    y += point.y;
-                    length++;
-                }
-                let objectPoint;
-                if (length > 1) {
-                    objectPoint = drawPinObject(true, value.point, arrData);
-                    objectPoint.className = 'maps-point group';
-                    let objectCount = document.createElement('p');
-                    objectCount.innerText = state + '/' + length;
-                    objectPoint.querySelector('div').appendChild(objectCount);
-                    let groupX = x / length;
-                    let groupY = y / length;
-                    objectPoint.setAttribute('style', 'transform: translate(' + (groupX + MAPS_RelativeX) + 'px, ' + (groupY + MAPS_RelativeY) + 'px);');
-                    objectPoint.setAttribute('data-state', state == length ? 'true' : 'false');
-                    objectPoint.removeAttribute('data-tip');
-                    if (IS_UNDERGROUND_ACTIVE !== value.point.tag?.includes('지하')) {
-                        objectPoint.removeAttribute('data-is-underground');
-                    }
-                    // 사이즈 설정
-                    objectPoint.style.marginLeft = objectPoint.style.marginTop = '-64px';
-                    OBJECT_PIN_LAYER.appendChild(objectPoint);
-                }
-                else {
-                    for (const point of value.points) {
-                        objectPoint = drawPinObject(false, point, arrData);
-                        OBJECT_PIN_LAYER.appendChild(objectPoint);
-                    }
-                }
-            });
+            return originalResult;
         }
     });
 }
@@ -912,20 +832,16 @@ function drawUndergroundLayer() {
     }
     undergroundLayer.style.transform = `scale(${layerScale})`;
 }
-function removeDisabledMapsPin() {
-    if (!IS_VISIBLE_ACTIVE_MAPS_PIN)
-        return;
-    const dataSelector = IS_UNDERGROUND_ACTIVE ? ':not([data-is-underground]):not([data-tip*="지하 및 실내 구역 입구"])' : '[data-is-underground]';
-    document.querySelectorAll(`#mapsLayerPoint > .maps-point${dataSelector}`).forEach(element => element.remove());
-}
 // 맵을 움직일 때마다(맵에서 검정색이 잠시 보일 때마다) 실행되는 함수
 drawMapsLayer = (function (originDrawMapsLayer) {
     'use strict';
     return (boolPanelHide) => {
+        // 없어도 괜찮은지 확실하지 않음
+        // if (IS_VISIBLE_ACTIVE_MAPS_PIN) {
+        //   injectPinDrawGet();
+        // }
         originDrawMapsLayer(boolPanelHide);
-        adjustMapsLayer();
         drawUndergroundLayer();
-        removeDisabledMapsPin();
     };
 }(drawMapsLayer));
 // 왼쪽 메뉴에서 핀을 제거할 때마다 실행되는 함수
@@ -956,6 +872,7 @@ removePin = ((originRemovePin) => {
     GM_addStyle(extension_css);
     addMapsExtensionSwitch();
     updateChestPinLoadedState();
+    injectPinDrawGet();
     // 지도 클릭 이벤트
     // objectViewer.addEventListener('click', function(e) {
     //   let x = e.clientX + objectViewer.scrollLeft;

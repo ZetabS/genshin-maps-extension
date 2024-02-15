@@ -69,7 +69,7 @@ declare const objectViewer: HTMLElement;
 
 // 왼쪽 메뉴에서 로드된 핀 분류
 declare let MAPS_PinLoad: ObservablePinDataArray;
-// 맵에 보여야 하는 핀
+// 맵에 보이고 있는 영역
 declare let MAPS_ViewPin: Set<string>;
 declare const MAPS_Scale: number;
 declare const MAPS_RelativeX: number;
@@ -77,7 +77,7 @@ declare const MAPS_RelativeY: number;
 declare const MAPS_Block: number;
 declare const MAPS_ViewSize: number;
 declare const MAPS_Size: number;
-declare const MAPS_PinDraw: Map<string, Array<MapData>>;
+declare let MAPS_PinDraw: Map<string, Array<MapData>>;
 declare const MAPS_State: {
   pinGroup: boolean,
   doubleTouch: boolean,
