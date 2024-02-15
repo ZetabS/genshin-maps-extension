@@ -100,6 +100,7 @@ function addMapsExtensionSwitch() {
       visibleActiveMapsPinSwitchElement.classList.remove('on');
     }
     setPinObjectRefresh();
+    setPinDataRefresh();
   });
 
   CHEST_FILTER = new vanillaSelectBox('#chest-filter', {

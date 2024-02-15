@@ -51,6 +51,11 @@ declare let MAPS_PinDraw: Map<string, Array<MapData>>;
 declare let removePin: Function;
 // 맵 타입 변경
 declare let changeMapsType: Function;
+declare let drawMapsLayer: Function;
+
+// 핀 리셋
+declare const setPinDataRefresh: Function;
+
 // 화면의 핀 요소 다시 그리기
 declare const setPinObjectRefresh: Function;
 
